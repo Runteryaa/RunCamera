@@ -22,16 +22,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "extraMavenRepos": [
-              "https://maven.arthenica.com/public/"
-            ]
-          }
-        }
-      ],
+      "./plugins/withFFmpegKit.js",
       [
         "expo-camera",
         {
