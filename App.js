@@ -4,7 +4,31 @@ import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission }
 import * as MediaLibrary from 'expo-media-library';
 import { SwitchCamera, Circle, Square } from 'lucide-react-native';
 
-export default function App() {
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 20 }}>
+          <Text style={{ color: 'red', fontWeight: 'bold', fontSize: 18, marginBottom: 10 }}>App Crashed!</Text>
+          <Text style={{ color: '#333' }}>{this.state.error?.toString()}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function MainApp() {
   const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
   const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } = useMicrophonePermission();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
@@ -200,3 +224,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
+}
