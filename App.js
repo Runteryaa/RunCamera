@@ -99,7 +99,6 @@ export default function App() {
         ref={cameraRef}
         video={true}
         audio={true}
-        enablePersistentRecorder={true}
       />
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
         <View style={styles.bottomControls}>
