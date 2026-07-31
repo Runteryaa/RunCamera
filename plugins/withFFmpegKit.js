@@ -5,7 +5,7 @@ module.exports = function withFFmpegKit(config) {
     if (config.modResults.language === 'groovy') {
       const extBlock = `
         ext {
-            ffmpegKitPackage = "min"
+            ffmpegKitPackage = "min-lts"
         }
       `;
       if (!config.modResults.contents.includes('ffmpegKitPackage')) {
