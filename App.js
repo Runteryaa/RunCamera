@@ -1,50 +1,29 @@
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView } from 'react-native';
+import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
-import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
-import * as FileSystem from 'expo-file-system';
 import { CameraReverse, Circle, Square } from 'lucide-react-native';
 
 export default function App() {
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
+  const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } = useMicrophonePermission();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
   
   const [facing, setFacing] = useState('back');
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   
+  const device = useCameraDevice(facing);
   const cameraRef = useRef(null);
-  const segmentsRef = useRef([]);
-  const resumeRecordingRef = useRef(false);
-  const isFinalStopRef = useRef(false);
 
   useEffect(() => {
     (async () => {
-      if (!cameraPermission?.granted) await requestCameraPermission();
-      if (!micPermission?.granted) await requestMicPermission();
+      if (!hasCameraPermission) await requestCameraPermission();
+      if (!hasMicPermission) await requestMicPermission();
       if (!mediaPermission?.granted) await requestMediaPermission();
     })();
-  }, []);
+  }, [hasCameraPermission, hasMicPermission, mediaPermission]);
 
-  // When camera facing changes and we need to resume recording
-  useEffect(() => {
-    if (resumeRecordingRef.current) {
-      resumeRecordingRef.current = false;
-      // Short delay to ensure camera is ready after flip
-      const timer = setTimeout(() => {
-        startRecordingFlow();
-      }, 600);
-      return () => clearTimeout(timer);
-    }
-  }, [facing]);
-
-  if (!cameraPermission || !micPermission) {
-    return <View style={styles.container} />;
-  }
-
-  if (!cameraPermission.granted || !micPermission.granted) {
+  if (!hasCameraPermission || !hasMicPermission) {
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need camera and microphone permissions to record videos.</Text>
@@ -55,155 +34,98 @@ export default function App() {
     );
   }
 
-  const startRecordingFlow = async () => {
+  if (device == null) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>Loading camera...</Text>
+      </View>
+    );
+  }
+
+  const startRecordingFlow = () => {
     if (!cameraRef.current) return;
-    try {
-      setIsRecording(true);
-      const video = await cameraRef.current.recordAsync({
-        maxDuration: 600, // max 10 mins
-      });
-      
-      if (video && video.uri) {
-        segmentsRef.current.push(video.uri);
-      }
-
-      if (isFinalStopRef.current) {
-        // This was the final stop, process the video
-        isFinalStopRef.current = false;
-        setIsRecording(false);
-        processAndSaveVideo();
-      }
-    } catch (error) {
-      console.error("Recording error:", error);
-      setIsRecording(false);
-      isFinalStopRef.current = false;
-      resumeRecordingRef.current = false;
-    }
-  };
-
-  const processAndSaveVideo = async () => {
-    const segments = segmentsRef.current;
-    if (segments.length === 0) return;
+    setIsRecording(true);
     
-    if (segments.length === 1) {
-      // Only one segment, just save it directly
-      await saveVideoToGallery(segments[0]);
-      segmentsRef.current = [];
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      // Create a text file listing all video segments for FFmpeg concat
-      const listContent = segments.map(uri => `file '${uri.replace('file://', '')}'`).join('\n');
-      const listPath = FileSystem.cacheDirectory + 'concat_list.txt';
-      await FileSystem.writeAsStringAsync(listPath, listContent);
-
-      const outputPath = FileSystem.cacheDirectory + `final_video_${Date.now()}.mp4`;
-      
-      // FFmpeg command to concatenate without re-encoding
-      const command = `-f concat -safe 0 -i "${listPath}" -c copy "${outputPath}"`;
-      
-      const session = await FFmpegKit.execute(command);
-      const returnCode = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        await saveVideoToGallery(outputPath);
-      } else {
-        const logs = await session.getLogs();
-        console.error("FFmpeg Error:", logs);
-        Alert.alert("Error", "Failed to merge video segments.");
+    cameraRef.current.startRecording({
+      onRecordingFinished: async (video) => {
+        setIsRecording(false);
+        try {
+          const asset = await MediaLibrary.createAssetAsync(`file://${video.path}`);
+          await MediaLibrary.createAlbumAsync("RunCamera", asset, false);
+          Alert.alert("Success", "Video saved to gallery!");
+        } catch (error) {
+          console.error("Save error:", error);
+          Alert.alert("Error", "Failed to save video to gallery.");
+        }
+      },
+      onRecordingError: (error) => {
+        console.error("Recording error:", error);
+        setIsRecording(false);
       }
-    } catch (error) {
-      console.error("Processing error:", error);
-      Alert.alert("Error", "An unexpected error occurred while processing.");
-    } finally {
-      setIsProcessing(false);
-      segmentsRef.current = [];
-    }
+    });
   };
 
-  const saveVideoToGallery = async (uri) => {
-    try {
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync("RunCamera", asset, false);
-      Alert.alert("Success", "Video saved to gallery!");
-    } catch (error) {
-      console.error("Save error:", error);
-      Alert.alert("Error", "Failed to save video to gallery.");
-    }
-  };
-
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (isRecording) {
-      // Final stop
-      isFinalStopRef.current = true;
-      cameraRef.current.stopRecording();
+      await cameraRef.current.stopRecording();
     } else {
-      // Start fresh
-      segmentsRef.current = [];
-      isFinalStopRef.current = false;
-      resumeRecordingRef.current = false;
       startRecordingFlow();
     }
   };
 
-  const flipCamera = () => {
+  const flipCamera = async () => {
     if (isRecording) {
-      // Flip while recording: stop current, flip, then auto-resume
-      resumeRecordingRef.current = true;
-      cameraRef.current.stopRecording();
+      // Pause, switch, and resume to keep it in a single file
+      await cameraRef.current.pauseRecording();
       setFacing(current => (current === 'back' ? 'front' : 'back'));
+      
+      // Give the new camera device a moment to initialize before resuming
+      setTimeout(async () => {
+        if (cameraRef.current) {
+          await cameraRef.current.resumeRecording();
+        }
+      }, 800);
     } else {
-      // Just flip
       setFacing(current => (current === 'back' ? 'front' : 'back'));
     }
   };
 
   return (
     <View style={styles.container}>
-      <CameraView 
+      <Camera 
         style={styles.camera} 
-        facing={facing} 
+        device={device}
+        isActive={true}
         ref={cameraRef}
-        mode="video"
-      >
-        <SafeAreaView style={styles.uiContainer}>
-          {isProcessing ? (
-            <View style={styles.processingOverlay}>
-              <ActivityIndicator size="large" color="#FF3B30" />
-              <Text style={styles.processingText}>Processing Video...</Text>
+        video={true}
+        audio={true}
+        enablePersistentRecorder={true}
+      />
+      <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
+        <View style={styles.bottomControls}>
+          <View style={styles.controlSpacer} />
+          
+          <TouchableOpacity 
+            style={styles.recordButtonWrapper} 
+            onPress={toggleRecording}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
+              {isRecording ? (
+                <Square color="#fff" size={24} fill="#fff" />
+              ) : (
+                <Circle color="#FF3B30" size={56} fill="#FF3B30" />
+              )}
             </View>
-          ) : (
-            <View style={styles.bottomControls}>
-              {/* Spacer */}
-              <View style={styles.controlSpacer} />
-              
-              {/* Record Button */}
-              <TouchableOpacity 
-                style={styles.recordButtonWrapper} 
-                onPress={toggleRecording}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
-                  {isRecording ? (
-                    <Square color="#fff" size={24} fill="#fff" />
-                  ) : (
-                    <Circle color="#FF3B30" size={56} fill="#FF3B30" />
-                  )}
-                </View>
-              </TouchableOpacity>
+          </TouchableOpacity>
 
-              {/* Flip Button */}
-              <TouchableOpacity style={styles.controlSpacer} onPress={flipCamera}>
-                <View style={styles.flipButton}>
-                  <CameraReverse color="#fff" size={32} />
-                </View>
-              </TouchableOpacity>
+          <TouchableOpacity style={styles.controlSpacer} onPress={flipCamera}>
+            <View style={styles.flipButton}>
+              <CameraReverse color="#fff" size={32} />
             </View>
-          )}
-        </SafeAreaView>
-      </CameraView>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
@@ -215,13 +137,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   camera: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
   },
   uiContainer: {
-    flex: 1,
-    backgroundColor: 'transparent',
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
     paddingBottom: 40,
+    zIndex: 10,
   },
   bottomControls: {
     flexDirection: 'row',
@@ -262,7 +184,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    backdropFilter: 'blur(10px)',
   },
   message: {
     textAlign: 'center',
@@ -277,18 +198,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold',
-  },
-  processingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  processingText: {
-    color: '#fff',
-    marginTop: 15,
-    fontSize: 16,
     fontWeight: 'bold',
   },
 });
