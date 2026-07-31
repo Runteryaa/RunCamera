@@ -35,7 +35,7 @@ function MainApp() {
   
   const [facing, setFacing] = useState('back');
   const [isRecording, setIsRecording] = useState(false);
-  
+  const [torch, setTorch] = useState('off');
   const device = useCameraDevice(facing);
   const cameraRef = useRef(null);
 
@@ -117,8 +117,13 @@ function MainApp() {
         });
       }
     } else {
-      setFacing(current => (current === 'back' ? 'front' : 'back'));
+      setFacing(f => (f === 'back' ? 'front' : 'back'));
+      setTorch('off'); // Turn off torch when flipping
     }
+  };
+
+  const toggleTorch = () => {
+    setTorch(t => (t === 'on' ? 'off' : 'on'));
   };
 
   return (
@@ -130,14 +135,17 @@ function MainApp() {
         ref={cameraRef}
         video={true}
         audio={true}
+        torch={torch}
       />
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
         <View style={styles.bottomControls}>
-          <View style={styles.controlSpacer} />
-          
-          <TouchableOpacity style={styles.controlSpacer} onPress={() => {}}>
-            {/* Empty space for layout balance */}
-          </TouchableOpacity>
+          <View style={styles.sideColumn}>
+            {device?.hasTorch && (
+              <TouchableOpacity style={styles.sideButton} onPress={toggleTorch}>
+                <Ionicons name={torch === 'on' ? 'flash' : 'flash-off'} size={28} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
 
           <TouchableOpacity 
             style={[styles.recordButton, isRecording && styles.recordingButton]}
@@ -148,11 +156,11 @@ function MainApp() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.controlSpacer} onPress={flipCamera}>
-            <View style={styles.flipButton}>
+          <View style={[styles.sideColumn, { alignItems: 'flex-end' }]}>
+            <TouchableOpacity style={styles.sideButton} onPress={flipCamera}>
               <Ionicons name="camera-reverse" size={32} color="#fff" />
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     </View>
@@ -176,41 +184,40 @@ const styles = StyleSheet.create({
   },
   bottomControls: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 30,
-  },
-  controlSpacer: {
-    flex: 1,
     alignItems: 'center',
+    paddingBottom: 40,
+    paddingHorizontal: 40,
+    width: '100%',
   },
-  recordButtonWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: '#ffffff80',
+  sideColumn: {
+    flex: 1,
+  },
+  sideButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   recordButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 4,
+    borderColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
-  recordButtonActive: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#FF3B30',
+  recordingButton: {
+    borderColor: 'red',
   },
-  flipButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  recordButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
   },
