@@ -4,14 +4,14 @@
   "main": "index.js",
   "dependencies": {
     "expo": "^54.0.36",
+    "expo-dev-client": "~6.0.21",
     "expo-media-library": "~18.2.1",
     "expo-status-bar": "~3.0.9",
-    "react-native-vision-camera": "^4.6.3",
-    "expo-dev-client": "~4.0.28",
-    "react-native-svg": "15.8.0",
     "lucide-react-native": "^0.474.0",
     "react": "19.1.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "react-native-svg": "15.8.0",
+    "react-native-vision-camera": "^4.6.3"
   },
   "scripts": {
     "start": "expo start",
