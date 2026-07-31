@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
-import { CameraReverse, Circle, Square } from 'lucide-react-native';
+import { SwitchCamera, Circle, Square } from 'lucide-react-native';
 
 export default function App() {
   const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
@@ -121,7 +121,7 @@ export default function App() {
 
           <TouchableOpacity style={styles.controlSpacer} onPress={flipCamera}>
             <View style={styles.flipButton}>
-              <CameraReverse color="#fff" size={32} />
+              <SwitchCamera color="#fff" size={32} />
             </View>
           </TouchableOpacity>
         </View>
