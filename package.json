@@ -5,8 +5,8 @@
   "dependencies": {
     "expo": "~57.0.9",
     "expo-camera": "~57.0.3",
-    "expo-media-library": "~17.0.3",
-    "expo-status-bar": "~2.0.0",
+    "expo-media-library": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
     "ffmpeg-kit-react-native": "^5.1.0",
     "lucide-react-native": "^0.474.0",
     "react": "19.2.3",
