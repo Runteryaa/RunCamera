@@ -47,21 +47,21 @@ jobs:
           npx expo prebuild --platform android
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --build-cache
+          ./gradlew assembleRelease --no-daemon --build-cache
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RunCamera-Debug.apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: RunCamera.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
 
       - name: 🏷 Create Release & Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}-debug
-          name: Camera Dev Build v1.0.${{ github.run_number }}
+          tag_name: v1.0.${{ github.run_number }}
+          name: Camera v1.0.${{ github.run_number }}
           body: |
-            Development build to debug crashes.
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+            camera
+          files: android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
