@@ -1,0 +1,13 @@
+diff --git a/node_modules/ffmpeg-kit-react-native/android/build.gradle b/node_modules/ffmpeg-kit-react-native/android/build.gradle
+index dcb21f2..0f4aefa 100644
+--- a/node_modules/ffmpeg-kit-react-native/android/build.gradle
++++ b/node_modules/ffmpeg-kit-react-native/android/build.gradle
+@@ -22,7 +22,7 @@ def safePackageVersion(String packageName) {
+ }
+ 
+ def safeExtGet(String prop, String fallback) {
+-  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
++  return "min-lts"
+ }
+ 
+ android {

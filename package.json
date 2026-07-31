@@ -3,20 +3,24 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "expo": "~57.0.9",
-    "expo-camera": "~57.0.3",
-    "expo-media-library": "~57.0.3",
-    "expo-status-bar": "~57.0.1",
+    "expo": "^54.0.36",
+    "expo-camera": "~17.0.10",
+    "expo-media-library": "~18.2.1",
+    "expo-status-bar": "~3.0.9",
     "ffmpeg-kit-react-native": "^5.1.0",
     "lucide-react-native": "^0.474.0",
-    "react": "19.2.3",
-    "react-native": "0.86.2"
+    "react": "19.1.0",
+    "react-native": "0.81.5"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "patch-package": "^8.0.1"
+  }
 }
