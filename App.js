@@ -100,15 +100,22 @@ function MainApp() {
   const flipCamera = async () => {
     if (isRecording) {
       // Pause, switch, and resume to keep it in a single file
+      const wasRecording = isRecording;
       await cameraRef.current.pauseRecording();
-      setFacing(current => (current === 'back' ? 'front' : 'back'));
+      setFacing(f => (f === 'back' ? 'front' : 'back'));
       
-      // Give the new camera device a moment to initialize before resuming
-      setTimeout(async () => {
-        if (cameraRef.current) {
-          await cameraRef.current.resumeRecording();
-        }
-      }, 800);
+      if (wasRecording) {
+        // Attempt to resume immediately. We use requestAnimationFrame to ensure React has updated the device prop.
+        requestAnimationFrame(async () => {
+          try {
+            if (cameraRef.current) {
+              await cameraRef.current.resumeRecording();
+            }
+          } catch (e) {
+            console.error("Failed to resume", e);
+          }
+        });
+      }
     } else {
       setFacing(current => (current === 'back' ? 'front' : 'back'));
     }
