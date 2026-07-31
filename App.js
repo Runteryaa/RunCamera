@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
-import { SwitchCamera, Circle, Square } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -128,23 +128,22 @@ function MainApp() {
         <View style={styles.bottomControls}>
           <View style={styles.controlSpacer} />
           
+          <TouchableOpacity style={styles.controlSpacer} onPress={() => {}}>
+            {/* Empty space for layout balance */}
+          </TouchableOpacity>
+
           <TouchableOpacity 
-            style={styles.recordButtonWrapper} 
+            style={[styles.recordButton, isRecording && styles.recordingButton]}
             onPress={toggleRecording}
-            activeOpacity={0.7}
           >
-            <View style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
-              {isRecording ? (
-                <Square color="#fff" size={24} fill="#fff" />
-              ) : (
-                <Circle color="#FF3B30" size={56} fill="#FF3B30" />
-              )}
+            <View style={styles.recordButtonInner}>
+              {isRecording ? <Ionicons name="square" size={24} color="red" /> : <Ionicons name="ellipse" size={32} color="red" />}
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.controlSpacer} onPress={flipCamera}>
             <View style={styles.flipButton}>
-              <SwitchCamera color="#fff" size={32} />
+              <Ionicons name="camera-reverse" size={32} color="#fff" />
             </View>
           </TouchableOpacity>
         </View>
