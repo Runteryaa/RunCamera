@@ -66,6 +66,7 @@ function MainApp() {
   
   const [facing, setFacing] = useState('back');
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [torch, setTorch] = useState('off');
   const device = useCameraDevice(facing);
   const cameraRef = useRef(null);
@@ -100,10 +101,12 @@ function MainApp() {
   const startRecordingFlow = () => {
     if (!cameraRef.current) return;
     setIsRecording(true);
+    setIsPaused(false);
     
     cameraRef.current.startRecording({
       onRecordingFinished: async (video) => {
         setIsRecording(false);
+        setIsPaused(false);
         try {
           const asset = await MediaLibrary.createAssetAsync(`file://${video.path}`);
           await MediaLibrary.createAlbumAsync("RunCamera", asset, false);
@@ -116,28 +119,69 @@ function MainApp() {
       onRecordingError: (error) => {
         console.error("Recording error:", error);
         setIsRecording(false);
+        setIsPaused(false);
       }
     });
   };
 
-  const toggleRecording = async () => {
-    if (isRecording) {
-      await cameraRef.current.stopRecording();
-    } else {
+  const handleRecordButtonPress = async () => {
+    if (!isRecording) {
       startRecordingFlow();
+    } else if (isPaused) {
+      // Resume recording
+      try {
+        if (cameraRef.current) {
+          await cameraRef.current.resumeRecording();
+          setIsPaused(false);
+        }
+      } catch (e) {
+        console.error("Resume error:", e);
+      }
+    } else {
+      // Stop recording completely
+      try {
+        if (cameraRef.current) {
+          await cameraRef.current.stopRecording();
+        }
+      } catch (e) {
+        console.error("Stop error:", e);
+      }
+    }
+  };
+
+  const handleRecordButtonLongPress = async () => {
+    if (isRecording && !isPaused) {
+      // Short long-press while recording pauses
+      try {
+        if (cameraRef.current) {
+          await cameraRef.current.pauseRecording();
+          setIsPaused(true);
+        }
+      } catch (e) {
+        console.error("Pause error:", e);
+      }
+    } else if (isRecording && isPaused) {
+      // Long press while paused stops
+      try {
+        if (cameraRef.current) {
+          await cameraRef.current.stopRecording();
+        }
+      } catch (e) {
+        console.error("Stop error:", e);
+      }
     }
   };
 
   const flipCamera = async () => {
     if (isRecording) {
-      // Pause, switch, and resume to keep it in a single file
-      const wasRecording = isRecording;
-      await cameraRef.current.pauseRecording();
+      const wasPaused = isPaused;
+      if (!wasPaused && cameraRef.current) {
+        await cameraRef.current.pauseRecording();
+      }
       setFacing(f => (f === 'back' ? 'front' : 'back'));
       setTorch('off');
       
-      if (wasRecording) {
-        // Attempt to resume immediately. We use requestAnimationFrame to ensure React has updated the device prop.
+      if (!wasPaused) {
         requestAnimationFrame(async () => {
           try {
             if (cameraRef.current) {
@@ -170,6 +214,16 @@ function MainApp() {
         torch={facing === 'back' ? torch : 'off'}
       />
       {facing === 'front' && torch === 'on' && <FrontScreenFlash />}
+
+      {isRecording && (
+        <SafeAreaView style={styles.statusBadgeContainer} pointerEvents="none">
+          <View style={styles.recordingStatusBadge}>
+            <View style={[styles.statusDot, isPaused ? styles.statusDotPaused : styles.statusDotRecording]} />
+            <Text style={styles.statusText}>{isPaused ? 'DURAKLATILDI' : 'KAYIT'}</Text>
+          </View>
+        </SafeAreaView>
+      )}
+
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
         <View style={styles.bottomControls}>
           <View style={styles.sideColumn}>
@@ -188,11 +242,23 @@ function MainApp() {
           </View>
 
           <TouchableOpacity 
-            style={[styles.recordButton, isRecording && styles.recordingButton]}
-            onPress={toggleRecording}
+            style={[
+              styles.recordButton, 
+              isRecording && (isPaused ? styles.recordingButtonPaused : styles.recordingButton)
+            ]}
+            onPress={handleRecordButtonPress}
+            onLongPress={handleRecordButtonLongPress}
+            delayLongPress={350}
+            activeOpacity={0.7}
           >
             <View style={styles.recordButtonInner}>
-              {isRecording ? <Ionicons name="square" size={24} color="red" /> : <Ionicons name="ellipse" size={32} color="red" />}
+              {!isRecording ? (
+                <Ionicons name="ellipse" size={32} color="red" />
+              ) : isPaused ? (
+                <Ionicons name="play" size={30} color="#FF9500" style={{ marginLeft: 3 }} />
+              ) : (
+                <Ionicons name="square" size={24} color="red" />
+              )}
             </View>
           </TouchableOpacity>
 
@@ -215,6 +281,40 @@ const styles = StyleSheet.create({
   },
   camera: {
     ...StyleSheet.absoluteFillObject,
+  },
+  statusBadgeContainer: {
+    position: 'absolute',
+    top: 15,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  recordingStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  statusDotRecording: {
+    backgroundColor: '#FF3B30',
+  },
+  statusDotPaused: {
+    backgroundColor: '#FF9500',
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 0.6,
   },
   uiContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -257,7 +357,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   recordingButton: {
-    borderColor: 'red',
+    borderColor: '#FF3B30',
+  },
+  recordingButtonPaused: {
+    borderColor: '#FF9500',
+    backgroundColor: 'rgba(255, 149, 0, 0.15)',
   },
   recordButtonInner: {
     width: 60,
