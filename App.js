@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView, AppState, StatusBar, Platform } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView, AppState, StatusBar, Platform, Image } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
@@ -95,10 +95,15 @@ function MainApp() {
   const [duration, setDuration] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [focusPoint, setFocusPoint] = useState(null);
+  const [freezeFrameUri, setFreezeFrameUri] = useState(null);
   const [torch, setTorch] = useState('off');
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const originalBrightnessRef = useRef(null);
-  const device = useCameraDevice(facing);
+
+  // Pre-fetch both devices into memory for instant switching
+  const backDevice = useCameraDevice('back');
+  const frontDevice = useCameraDevice('front');
+  const device = facing === 'back' ? backDevice : frontDevice;
   const cameraRef = useRef(null);
 
   // Timer Effect
@@ -123,6 +128,16 @@ function MainApp() {
       return () => clearTimeout(timeout);
     }
   }, [focusPoint]);
+
+  // Freeze Frame Safety Dismiss
+  useEffect(() => {
+    if (freezeFrameUri) {
+      const timer = setTimeout(() => {
+        setFreezeFrameUri(null);
+      }, 450);
+      return () => clearTimeout(timer);
+    }
+  }, [freezeFrameUri]);
 
   // Screen Brightness Boost for Front Camera Flash (TikTok Style)
   useEffect(() => {
@@ -304,10 +319,27 @@ function MainApp() {
     }
   };
 
-  const flipCamera = () => {
+  const flipCamera = async () => {
+    try {
+      if (cameraRef.current) {
+        const snapshot = await cameraRef.current.takeSnapshot({ quality: 85, skipMetadata: true });
+        if (snapshot?.path) {
+          setFreezeFrameUri(`file://${snapshot.path}`);
+        }
+      }
+    } catch (e) {
+      console.log("Snapshot skipped:", e);
+    }
+
     setFacing(f => (f === 'back' ? 'front' : 'back'));
     setTorch('off');
     setZoom(1);
+  };
+
+  const handleCameraInitialized = () => {
+    if (freezeFrameUri) {
+      setFreezeFrameUri(null);
+    }
   };
 
   const toggleTorch = () => {
@@ -327,11 +359,23 @@ function MainApp() {
         ref={cameraRef}
         video={true}
         audio={true}
+        photo={true}
         zoom={zoom}
+        onInitialized={handleCameraInitialized}
         androidPreviewViewType="surface-view"
         enableZoomGesture={true}
         torch={facing === 'back' ? torch : 'off'}
       />
+
+      {/* Seamless Freeze Frame Overlay during Camera Flip (Instagram / TikTok Style) */}
+      {freezeFrameUri && (
+        <Image 
+          source={{ uri: freezeFrameUri }} 
+          style={StyleSheet.absoluteFillObject} 
+          resizeMode="cover"
+          pointerEvents="none"
+        />
+      )}
 
       {/* Tap to Focus Tap Area */}
       <TouchableOpacity 
