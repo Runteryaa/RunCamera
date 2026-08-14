@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView, AppState } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,23 +32,23 @@ class ErrorBoundary extends React.Component {
 function FrontScreenFlash() {
   const gradientStops = [
     'rgba(255, 255, 255, 1.0)',
-    'rgba(255, 255, 255, 0.90)',
-    'rgba(255, 255, 255, 0.72)',
-    'rgba(255, 255, 255, 0.48)',
-    'rgba(255, 255, 255, 0.28)',
-    'rgba(255, 255, 255, 0.12)',
-    'rgba(255, 255, 255, 0.03)',
+    'rgba(255, 255, 255, 0.98)',
+    'rgba(255, 255, 255, 0.88)',
+    'rgba(255, 255, 255, 0.68)',
+    'rgba(255, 255, 255, 0.42)',
+    'rgba(255, 255, 255, 0.20)',
+    'rgba(255, 255, 255, 0.05)',
     'rgba(255, 255, 255, 0.0)',
   ];
 
   const reverseGradientStops = [
     'rgba(255, 255, 255, 0.0)',
-    'rgba(255, 255, 255, 0.03)',
-    'rgba(255, 255, 255, 0.12)',
-    'rgba(255, 255, 255, 0.28)',
-    'rgba(255, 255, 255, 0.48)',
-    'rgba(255, 255, 255, 0.72)',
-    'rgba(255, 255, 255, 0.90)',
+    'rgba(255, 255, 255, 0.05)',
+    'rgba(255, 255, 255, 0.20)',
+    'rgba(255, 255, 255, 0.42)',
+    'rgba(255, 255, 255, 0.68)',
+    'rgba(255, 255, 255, 0.88)',
+    'rgba(255, 255, 255, 0.98)',
     'rgba(255, 255, 255, 1.0)',
   ];
 
@@ -100,6 +100,7 @@ function MainApp() {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [torch, setTorch] = useState('off');
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const device = useCameraDevice(facing);
   const cameraRef = useRef(null);
 
@@ -110,6 +111,32 @@ function MainApp() {
       if (!mediaPermission?.granted) await requestMediaPermission();
     })();
   }, [hasCameraPermission, hasMicPermission, mediaPermission]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      const active = nextAppState === 'active';
+      setIsAppActive(active);
+
+      if (!active) {
+        // App went to background - safely stop recording if in progress
+        if (cameraRef.current && isRecording) {
+          try {
+            await cameraRef.current.stopRecording();
+          } catch (e) {
+            console.error("Stop recording on background error:", e);
+          }
+          setIsRecording(false);
+          setIsPaused(false);
+        }
+      } else {
+        // App returned to foreground - ensure permissions are fresh
+        if (!hasCameraPermission) await requestCameraPermission();
+        if (!hasMicPermission) await requestMicPermission();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [isRecording, hasCameraPermission, hasMicPermission]);
 
   if (!hasCameraPermission || !hasMicPermission) {
     return (
@@ -239,7 +266,7 @@ function MainApp() {
       <Camera 
         style={styles.camera} 
         device={device}
-        isActive={true}
+        isActive={isAppActive}
         ref={cameraRef}
         video={true}
         audio={true}
@@ -316,7 +343,7 @@ const styles = StyleSheet.create({
   },
   flashOuterBorder: {
     ...StyleSheet.absoluteFillObject,
-    borderWidth: 10,
+    borderWidth: 26,
     borderColor: '#FFFFFF',
     zIndex: 1,
   },
@@ -325,7 +352,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 140,
+    height: 180,
     zIndex: 2,
   },
   flashGradientBottom: {
@@ -333,7 +360,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 160,
+    height: 200,
     zIndex: 2,
   },
   flashGradientLeft: {
@@ -341,7 +368,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: 85,
+    width: 110,
     zIndex: 2,
   },
   flashGradientRight: {
@@ -349,12 +376,12 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: 85,
+    width: 110,
     zIndex: 2,
   },
   flashCenterAmbient: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   statusBadgeContainer: {
     position: 'absolute',
