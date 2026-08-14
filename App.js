@@ -99,6 +99,7 @@ function MainApp() {
   const [torch, setTorch] = useState('off');
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const originalBrightnessRef = useRef(null);
+  const isFlippingRef = useRef(false);
 
   // Pre-fetch both devices into memory for instant switching
   const backDevice = useCameraDevice('back');
@@ -129,15 +130,23 @@ function MainApp() {
     }
   }, [focusPoint]);
 
-  // Freeze Frame Safety Dismiss
+  // Freeze Frame Safety Dismiss & Timeline Resync
   useEffect(() => {
     if (freezeFrameUri) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         setFreezeFrameUri(null);
-      }, 450);
+        if (isRecording && isFlippingRef.current) {
+          isFlippingRef.current = false;
+          try {
+            if (cameraRef.current) {
+              await cameraRef.current.resumeRecording();
+            }
+          } catch (e) {}
+        }
+      }, 500);
       return () => clearTimeout(timer);
     }
-  }, [freezeFrameUri]);
+  }, [freezeFrameUri, isRecording]);
 
   // Screen Brightness Boost for Front Camera Flash (TikTok Style)
   useEffect(() => {
@@ -320,25 +329,45 @@ function MainApp() {
   };
 
   const flipCamera = async () => {
-    try {
-      if (cameraRef.current) {
-        const snapshot = await cameraRef.current.takeSnapshot({ quality: 85, skipMetadata: true });
-        if (snapshot?.path) {
-          setFreezeFrameUri(`file://${snapshot.path}`);
+    if (isRecording) {
+      isFlippingRef.current = !isPaused;
+      try {
+        if (cameraRef.current) {
+          const snapshot = await cameraRef.current.takeSnapshot({ quality: 85, skipMetadata: true });
+          if (snapshot?.path) {
+            setFreezeFrameUri(`file://${snapshot.path}`);
+          }
+          if (!isPaused) {
+            await cameraRef.current.pauseRecording();
+          }
         }
+      } catch (e) {
+        console.log("Snapshot / pause error on flip:", e);
       }
-    } catch (e) {
-      console.log("Snapshot skipped:", e);
-    }
 
-    setFacing(f => (f === 'back' ? 'front' : 'back'));
-    setTorch('off');
-    setZoom(1);
+      setFacing(f => (f === 'back' ? 'front' : 'back'));
+      setTorch('off');
+      setZoom(1);
+    } else {
+      setFacing(f => (f === 'back' ? 'front' : 'back'));
+      setTorch('off');
+      setZoom(1);
+    }
   };
 
-  const handleCameraInitialized = () => {
+  const handleCameraInitialized = async () => {
     if (freezeFrameUri) {
       setFreezeFrameUri(null);
+    }
+    if (isRecording && isFlippingRef.current) {
+      isFlippingRef.current = false;
+      try {
+        if (cameraRef.current) {
+          await cameraRef.current.resumeRecording();
+        }
+      } catch (e) {
+        console.log("Resume on initialized error:", e);
+      }
     }
   };
 
