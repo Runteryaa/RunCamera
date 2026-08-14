@@ -95,11 +95,9 @@ function MainApp() {
   const [duration, setDuration] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [focusPoint, setFocusPoint] = useState(null);
-  const [freezeFrameUri, setFreezeFrameUri] = useState(null);
   const [torch, setTorch] = useState('off');
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const originalBrightnessRef = useRef(null);
-  const isFlippingRef = useRef(false);
 
   // Pre-fetch both devices into memory for instant switching
   const backDevice = useCameraDevice('back');
@@ -129,24 +127,6 @@ function MainApp() {
       return () => clearTimeout(timeout);
     }
   }, [focusPoint]);
-
-  // Freeze Frame Safety Dismiss & Timeline Resync
-  useEffect(() => {
-    if (freezeFrameUri) {
-      const timer = setTimeout(async () => {
-        setFreezeFrameUri(null);
-        if (isRecording && isFlippingRef.current) {
-          isFlippingRef.current = false;
-          try {
-            if (cameraRef.current) {
-              await cameraRef.current.resumeRecording();
-            }
-          } catch (e) {}
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [freezeFrameUri, isRecording]);
 
   // Screen Brightness Boost for Front Camera Flash (TikTok Style)
   useEffect(() => {
@@ -328,47 +308,10 @@ function MainApp() {
     }
   };
 
-  const flipCamera = async () => {
-    if (isRecording) {
-      isFlippingRef.current = !isPaused;
-      try {
-        if (cameraRef.current) {
-          const snapshot = await cameraRef.current.takeSnapshot({ quality: 85, skipMetadata: true });
-          if (snapshot?.path) {
-            setFreezeFrameUri(`file://${snapshot.path}`);
-          }
-          if (!isPaused) {
-            await cameraRef.current.pauseRecording();
-          }
-        }
-      } catch (e) {
-        console.log("Snapshot / pause error on flip:", e);
-      }
-
-      setFacing(f => (f === 'back' ? 'front' : 'back'));
-      setTorch('off');
-      setZoom(1);
-    } else {
-      setFacing(f => (f === 'back' ? 'front' : 'back'));
-      setTorch('off');
-      setZoom(1);
-    }
-  };
-
-  const handleCameraInitialized = async () => {
-    if (freezeFrameUri) {
-      setFreezeFrameUri(null);
-    }
-    if (isRecording && isFlippingRef.current) {
-      isFlippingRef.current = false;
-      try {
-        if (cameraRef.current) {
-          await cameraRef.current.resumeRecording();
-        }
-      } catch (e) {
-        console.log("Resume on initialized error:", e);
-      }
-    }
+  const flipCamera = () => {
+    setFacing(f => (f === 'back' ? 'front' : 'back'));
+    setTorch('off');
+    setZoom(1);
   };
 
   const toggleTorch = () => {
@@ -388,23 +331,11 @@ function MainApp() {
         ref={cameraRef}
         video={true}
         audio={true}
-        photo={true}
         zoom={zoom}
-        onInitialized={handleCameraInitialized}
         androidPreviewViewType="surface-view"
         enableZoomGesture={true}
         torch={facing === 'back' ? torch : 'off'}
       />
-
-      {/* Seamless Freeze Frame Overlay during Camera Flip (Instagram / TikTok Style) */}
-      {freezeFrameUri && (
-        <Image 
-          source={{ uri: freezeFrameUri }} 
-          style={StyleSheet.absoluteFillObject} 
-          resizeMode="cover"
-          pointerEvents="none"
-        />
-      )}
 
       {/* Tap to Focus Tap Area */}
       <TouchableOpacity 
