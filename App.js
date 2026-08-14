@@ -323,24 +323,52 @@ function MainApp() {
   const rawPresets = minZoom < 1 ? [0.5, 1, 2, 3, 5] : [1, 2, 3, 5];
   const validZoomPresets = rawPresets.filter(z => z >= minZoom && z <= maxZoom);
 
-  const sliderWidth = 200;
+  const sliderRef = useRef(null);
+  const sliderBoundsRef = useRef({ pageX: 0, width: 220 });
+  const minZoomRef = useRef(1);
+  const maxZoomRef = useRef(8);
+
+  minZoomRef.current = minZoom;
+  maxZoomRef.current = maxZoom;
+
+  const updateZoomFromPageX = (pageX) => {
+    const bounds = sliderBoundsRef.current;
+    if (!bounds || bounds.width <= 0) return;
+    const localX = pageX - bounds.pageX;
+    const ratio = Math.max(0, Math.min(1, localX / bounds.width));
+    const calculated = minZoomRef.current + ratio * (maxZoomRef.current - minZoomRef.current);
+    const rounded = parseFloat(calculated.toFixed(1));
+    setZoom(rounded);
+  };
+
+  const handleSliderLayout = () => {
+    if (sliderRef.current) {
+      sliderRef.current.measure((x, y, width, height, pageX, pageY) => {
+        if (width > 0) {
+          sliderBoundsRef.current = { pageX, width };
+        }
+      });
+    }
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
-        const x = evt.nativeEvent.locationX;
-        const clampedX = Math.max(0, Math.min(x, sliderWidth));
-        const ratio = clampedX / sliderWidth;
-        const newZoom = minZoom + ratio * (maxZoom - minZoom);
-        setZoom(parseFloat(newZoom.toFixed(1)));
+        if (sliderRef.current) {
+          sliderRef.current.measure((x, y, width, height, pageX, pageY) => {
+            if (width > 0) {
+              sliderBoundsRef.current = { pageX, width };
+            }
+            updateZoomFromPageX(evt.nativeEvent.pageX);
+          });
+        } else {
+          updateZoomFromPageX(evt.nativeEvent.pageX);
+        }
       },
       onPanResponderMove: (evt) => {
-        const x = evt.nativeEvent.locationX;
-        const clampedX = Math.max(0, Math.min(x, sliderWidth));
-        const ratio = clampedX / sliderWidth;
-        const newZoom = minZoom + ratio * (maxZoom - minZoom);
-        setZoom(parseFloat(newZoom.toFixed(1)));
+        updateZoomFromPageX(evt.nativeEvent.pageX);
       },
     })
   ).current;
@@ -445,18 +473,23 @@ function MainApp() {
           </View>
 
           {/* Smooth Continuous Slider Track */}
-          <View style={styles.sliderTouchArea} {...panResponder.panHandlers}>
-            <View style={styles.sliderTrack}>
+          <View 
+            ref={sliderRef}
+            style={styles.sliderTouchArea} 
+            onLayout={handleSliderLayout}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.sliderTrack} pointerEvents="none">
               <View 
                 style={[
                   styles.sliderFill, 
-                  { width: `${Math.max(0, Math.min(100, ((zoom - minZoom) / (maxZoom - minZoom)) * 100))}%` }
+                  { width: `${Math.max(0, Math.min(100, ((zoom - minZoom) / (maxZoom - minZoom || 1)) * 100))}%` }
                 ]} 
               />
               <View 
                 style={[
                   styles.sliderThumb, 
-                  { left: `${Math.max(0, Math.min(100, ((zoom - minZoom) / (maxZoom - minZoom)) * 100))}%` }
+                  { left: `${Math.max(0, Math.min(100, ((zoom - minZoom) / (maxZoom - minZoom || 1)) * 100))}%` }
                 ]} 
               />
             </View>
@@ -752,34 +785,39 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   sliderTouchArea: {
-    width: 200,
-    height: 28,
+    width: 220,
+    height: 38,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
   sliderTrack: {
-    width: 200,
-    height: 4,
-    borderRadius: 2,
+    width: 220,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     position: 'relative',
   },
   sliderFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
     backgroundColor: '#FFD700',
   },
   sliderThumb: {
     position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#FFD700',
-    top: -5,
-    marginLeft: -7,
-    borderWidth: 2,
+    top: -6,
+    marginLeft: -9,
+    borderWidth: 2.5,
     borderColor: '#fff',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
 });
 
