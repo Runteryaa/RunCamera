@@ -94,7 +94,6 @@ function MainApp() {
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [isMirrored, setIsMirrored] = useState(false);
   const [focusPoint, setFocusPoint] = useState(null);
   const [torch, setTorch] = useState('off');
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
@@ -305,32 +304,10 @@ function MainApp() {
     }
   };
 
-  const flipCamera = async () => {
-    if (isRecording) {
-      const wasPaused = isPaused;
-      if (!wasPaused && cameraRef.current) {
-        await cameraRef.current.pauseRecording();
-      }
-      setFacing(f => (f === 'back' ? 'front' : 'back'));
-      setTorch('off');
-      setZoom(1);
-      
-      if (!wasPaused) {
-        requestAnimationFrame(async () => {
-          try {
-            if (cameraRef.current) {
-              await cameraRef.current.resumeRecording();
-            }
-          } catch (e) {
-            console.error("Failed to resume", e);
-          }
-        });
-      }
-    } else {
-      setFacing(f => (f === 'back' ? 'front' : 'back'));
-      setTorch('off'); // Turn off torch when flipping
-      setZoom(1);
-    }
+  const flipCamera = () => {
+    setFacing(f => (f === 'back' ? 'front' : 'back'));
+    setTorch('off');
+    setZoom(1);
   };
 
   const toggleTorch = () => {
@@ -342,17 +319,16 @@ function MainApp() {
 
   return (
     <View style={styles.container}>
-      {/* Camera Viewport with TextureView for Hardware Mirroring */}
+      {/* Maximum Performance Direct Hardware SurfaceView */}
       <Camera 
-        style={[styles.camera, isMirrored && styles.mirroredCamera]} 
+        style={styles.camera} 
         device={device}
         isActive={isAppActive}
         ref={cameraRef}
         video={true}
         audio={true}
         zoom={zoom}
-        isMirrored={isMirrored}
-        androidPreviewViewType="texture-view"
+        androidPreviewViewType="surface-view"
         enableZoomGesture={true}
         torch={facing === 'back' ? torch : 'off'}
       />
@@ -392,7 +368,7 @@ function MainApp() {
       )}
 
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
-        {/* Quick Zoom & Mirror Controls */}
+        {/* Quick Zoom Controls */}
         <View style={styles.zoomContainer} pointerEvents="box-none">
           {zoomLevels.map((lvl) => {
             const isActiveZoom = Math.abs(zoom - lvl) < 0.2;
@@ -408,20 +384,6 @@ function MainApp() {
               </TouchableOpacity>
             );
           })}
-
-          <View style={styles.zoomDivider} />
-
-          {/* Mirror Camera Toggle */}
-          <TouchableOpacity
-            style={[styles.mirrorPill, isMirrored && styles.mirrorPillActive]}
-            onPress={() => setIsMirrored(m => !m)}
-          >
-            <Ionicons 
-              name="swap-horizontal" 
-              size={18} 
-              color={isMirrored ? '#000' : '#fff'} 
-            />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.bottomControls}>
@@ -480,9 +442,6 @@ const styles = StyleSheet.create({
   },
   camera: {
     ...StyleSheet.absoluteFillObject,
-  },
-  mirroredCamera: {
-    transform: [{ scaleX: -1 }],
   },
   flashSolidTop: {
     position: 'absolute',
@@ -684,12 +643,6 @@ const styles = StyleSheet.create({
     gap: 6,
     zIndex: 15,
   },
-  zoomDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    marginHorizontal: 2,
-  },
   zoomPill: {
     width: 36,
     height: 36,
@@ -708,17 +661,6 @@ const styles = StyleSheet.create({
   },
   zoomTextActive: {
     color: '#000',
-  },
-  mirrorPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  mirrorPillActive: {
-    backgroundColor: '#FFD700',
   },
 });
 
