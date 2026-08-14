@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView, AppState, StatusBar, Platform, Modal, Pressable } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView, AppState, StatusBar, Platform } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
@@ -97,8 +97,6 @@ function MainApp() {
   const [isMirrored, setIsMirrored] = useState(false);
   const [focusPoint, setFocusPoint] = useState(null);
   const [torch, setTorch] = useState('off');
-  const [audioSource, setAudioSource] = useState('auto'); // 'auto' | 'phone' | 'bluetooth' | 'mute'
-  const [isMicModalOpen, setIsMicModalOpen] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const originalBrightnessRef = useRef(null);
   const device = useCameraDevice(facing);
@@ -350,7 +348,7 @@ function MainApp() {
         isActive={isAppActive}
         ref={cameraRef}
         video={true}
-        audio={audioSource !== 'mute'}
+        audio={true}
         zoom={zoom}
         enableZoomGesture={true}
         torch={facing === 'back' ? torch : 'off'}
@@ -378,50 +376,17 @@ function MainApp() {
 
       {facing === 'front' && torch === 'on' && <FrontScreenFlash />}
 
-      {/* Top Header with Safe Area Notch Protection */}
-      <SafeAreaView style={styles.topHeaderContainer} pointerEvents="box-none">
-        <View style={styles.topHeaderRow} pointerEvents="box-none">
-          <View style={styles.topHeaderSide} />
-
-          {/* Center Status / Duration Badge */}
-          {isRecording ? (
-            <View style={styles.recordingStatusBadge}>
-              <View style={[styles.statusDot, isPaused ? styles.statusDotPaused : styles.statusDotRecording]} />
-              <Text style={styles.statusText}>
-                {isPaused ? `DURAKLATILDI  ${formatDuration(duration)}` : `KAYIT  ${formatDuration(duration)}`}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.topPlaceholder} />
-          )}
-
-          {/* Right Microphone Quick Selector Button */}
-          <View style={[styles.topHeaderSide, { alignItems: 'flex-end' }]}>
-            <TouchableOpacity 
-              style={[
-                styles.topIconButton, 
-                audioSource === 'mute' && styles.topIconButtonMuted,
-                audioSource === 'bluetooth' && styles.topIconButtonBT
-              ]} 
-              onPress={() => setIsMicModalOpen(true)}
-            >
-              <Ionicons 
-                name={
-                  audioSource === 'mute' 
-                    ? 'mic-off' 
-                    : audioSource === 'bluetooth' 
-                    ? 'bluetooth' 
-                    : audioSource === 'phone' 
-                    ? 'phone-portrait-outline' 
-                    : 'mic'
-                } 
-                size={18} 
-                color={audioSource === 'mute' ? '#FF3B30' : audioSource === 'bluetooth' ? '#007AFF' : '#fff'} 
-              />
-            </TouchableOpacity>
+      {/* Top Status & Duration Badge (Notch Safe) */}
+      {isRecording && (
+        <SafeAreaView style={styles.topHeaderContainer} pointerEvents="none">
+          <View style={styles.recordingStatusBadge}>
+            <View style={[styles.statusDot, isPaused ? styles.statusDotPaused : styles.statusDotRecording]} />
+            <Text style={styles.statusText}>
+              {isPaused ? `DURAKLATILDI  ${formatDuration(duration)}` : `KAYIT  ${formatDuration(duration)}`}
+            </Text>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      )}
 
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
         {/* Quick Zoom & Mirror Controls */}
@@ -500,75 +465,6 @@ function MainApp() {
           </View>
         </View>
       </SafeAreaView>
-
-      {/* Microphone Selection Modal */}
-      <Modal
-        visible={isMicModalOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsMicModalOpen(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setIsMicModalOpen(false)}>
-          <Pressable style={styles.modalContent} onPress={e => e.stopPropagation()}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="mic" size={22} color="#FFD700" style={{ marginRight: 8 }} />
-              <Text style={styles.modalTitle}>Mikrofon & Ses Kaynağı</Text>
-            </View>
-
-            <TouchableOpacity 
-              style={[styles.micOption, audioSource === 'auto' && styles.micOptionActive]}
-              onPress={() => { setAudioSource('auto'); setIsMicModalOpen(false); }}
-            >
-              <Ionicons name="sparkles" size={20} color={audioSource === 'auto' ? '#FFD700' : '#aaa'} />
-              <View style={styles.micOptionTextContainer}>
-                <Text style={[styles.micOptionTitle, audioSource === 'auto' && styles.micOptionTitleActive]}>Otomatik (Sistem Tercihi)</Text>
-                <Text style={styles.micOptionDesc}>Bağlı Bluetooth/harici mikrofon varsa otomatik kullanılır</Text>
-              </View>
-              {audioSource === 'auto' && <Ionicons name="checkmark-circle" size={20} color="#FFD700" />}
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.micOption, audioSource === 'bluetooth' && styles.micOptionActive]}
-              onPress={() => { setAudioSource('bluetooth'); setIsMicModalOpen(false); }}
-            >
-              <Ionicons name="bluetooth" size={20} color={audioSource === 'bluetooth' ? '#007AFF' : '#aaa'} />
-              <View style={styles.micOptionTextContainer}>
-                <Text style={[styles.micOptionTitle, audioSource === 'bluetooth' && styles.micOptionTitleActive]}>Bluetooth / Harici Mikrofon</Text>
-                <Text style={styles.micOptionDesc}>Kulaklık veya kablosuz yaka mikrofonu</Text>
-              </View>
-              {audioSource === 'bluetooth' && <Ionicons name="checkmark-circle" size={20} color="#FFD700" />}
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.micOption, audioSource === 'phone' && styles.micOptionActive]}
-              onPress={() => { setAudioSource('phone'); setIsMicModalOpen(false); }}
-            >
-              <Ionicons name="phone-portrait-outline" size={20} color={audioSource === 'phone' ? '#FFD700' : '#aaa'} />
-              <View style={styles.micOptionTextContainer}>
-                <Text style={[styles.micOptionTitle, audioSource === 'phone' && styles.micOptionTitleActive]}>Dahili Telefon Mikrofonu</Text>
-                <Text style={styles.micOptionDesc}>Cihazın dahili ana mikrofonu</Text>
-              </View>
-              {audioSource === 'phone' && <Ionicons name="checkmark-circle" size={20} color="#FFD700" />}
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.micOption, audioSource === 'mute' && styles.micOptionActive]}
-              onPress={() => { setAudioSource('mute'); setIsMicModalOpen(false); }}
-            >
-              <Ionicons name="mic-off" size={20} color={audioSource === 'mute' ? '#FF3B30' : '#aaa'} />
-              <View style={styles.micOptionTextContainer}>
-                <Text style={[styles.micOptionTitle, audioSource === 'mute' && { color: '#FF3B30' }]}>Sessiz Mod (Mikrofonu Kapat)</Text>
-                <Text style={styles.micOptionDesc}>Video ses olmadan kaydedilir</Text>
-              </View>
-              {audioSource === 'mute' && <Ionicons name="checkmark-circle" size={20} color="#FF3B30" />}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIsMicModalOpen(false)}>
-              <Text style={styles.modalCloseButtonText}>Tamam</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -659,38 +555,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 20,
-    paddingHorizontal: 20,
-  },
-  topHeaderRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  topHeaderSide: {
-    width: 44,
-    justifyContent: 'center',
-  },
-  topPlaceholder: {
-    flex: 1,
-  },
-  topIconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  topIconButtonMuted: {
-    borderColor: '#FF3B30',
-    backgroundColor: 'rgba(255, 59, 48, 0.2)',
-  },
-  topIconButtonBT: {
-    borderColor: '#007AFF',
-    backgroundColor: 'rgba(0, 122, 255, 0.2)',
   },
   recordingStatusBadge: {
     flexDirection: 'row',
@@ -851,72 +716,6 @@ const styles = StyleSheet.create({
   },
   mirrorPillActive: {
     backgroundColor: '#FFD700',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#1C1C1E',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  micOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  micOptionActive: {
-    borderColor: '#FFD700',
-    backgroundColor: 'rgba(255, 215, 0, 0.12)',
-  },
-  micOptionTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
-  },
-  micOptionTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  micOptionTitleActive: {
-    color: '#FFD700',
-  },
-  micOptionDesc: {
-    color: '#8E8E93',
-    fontSize: 12,
-  },
-  modalCloseButton: {
-    backgroundColor: '#FFD700',
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  modalCloseButtonText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });
 
