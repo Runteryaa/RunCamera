@@ -92,11 +92,37 @@ function MainApp() {
   const [facing, setFacing] = useState('back');
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [focusPoint, setFocusPoint] = useState(null);
   const [torch, setTorch] = useState('off');
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const originalBrightnessRef = useRef(null);
   const device = useCameraDevice(facing);
   const cameraRef = useRef(null);
+
+  // Timer Effect
+  useEffect(() => {
+    let interval = null;
+    if (isRecording && !isPaused) {
+      interval = setInterval(() => {
+        setDuration(d => d + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRecording, isPaused]);
+
+  // Focus Box Auto-Dismiss
+  useEffect(() => {
+    if (focusPoint) {
+      const timeout = setTimeout(() => {
+        setFocusPoint(null);
+      }, 1500);
+      return () => clearTimeout(timeout);
+    }
+  }, [focusPoint]);
 
   // Screen Brightness Boost for Front Camera Flash (TikTok Style)
   useEffect(() => {
@@ -151,6 +177,7 @@ function MainApp() {
           }
           setIsRecording(false);
           setIsPaused(false);
+          setDuration(0);
         }
       } else {
         // App returned to foreground - ensure permissions are fresh
@@ -181,15 +208,36 @@ function MainApp() {
     );
   }
 
+  const formatDuration = (sec) => {
+    const mins = Math.floor(sec / 60);
+    const seconds = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleTapToFocus = async (event) => {
+    const { locationX, locationY } = event.nativeEvent;
+    setFocusPoint({ x: locationX, y: locationY });
+
+    try {
+      if (cameraRef.current) {
+        await cameraRef.current.focus({ x: locationX, y: locationY });
+      }
+    } catch (e) {
+      console.warn("Focus error:", e);
+    }
+  };
+
   const startRecordingFlow = () => {
     if (!cameraRef.current) return;
     setIsRecording(true);
     setIsPaused(false);
+    setDuration(0);
     
     cameraRef.current.startRecording({
       onRecordingFinished: async (video) => {
         setIsRecording(false);
         setIsPaused(false);
+        setDuration(0);
         try {
           const asset = await MediaLibrary.createAssetAsync(`file://${video.path}`);
           await MediaLibrary.createAlbumAsync("RunCamera", asset, false);
@@ -203,6 +251,7 @@ function MainApp() {
         console.error("Recording error:", error);
         setIsRecording(false);
         setIsPaused(false);
+        setDuration(0);
       }
     });
   };
@@ -263,6 +312,7 @@ function MainApp() {
       }
       setFacing(f => (f === 'back' ? 'front' : 'back'));
       setTorch('off');
+      setZoom(1);
       
       if (!wasPaused) {
         requestAnimationFrame(async () => {
@@ -278,12 +328,16 @@ function MainApp() {
     } else {
       setFacing(f => (f === 'back' ? 'front' : 'back'));
       setTorch('off'); // Turn off torch when flipping
+      setZoom(1);
     }
   };
 
   const toggleTorch = () => {
     setTorch(t => (t === 'on' ? 'off' : 'on'));
   };
+
+  const minZoom = device?.minZoom ?? 1;
+  const zoomLevels = minZoom < 1 ? [0.5, 1, 2, 3] : [1, 2, 3];
 
   return (
     <View style={styles.container}>
@@ -294,20 +348,64 @@ function MainApp() {
         ref={cameraRef}
         video={true}
         audio={true}
+        zoom={zoom}
+        enableZoomGesture={true}
         torch={facing === 'back' ? torch : 'off'}
       />
+
+      {/* Tap to Focus Tap Area */}
+      <TouchableOpacity 
+        style={StyleSheet.absoluteFillObject} 
+        activeOpacity={1} 
+        onPress={handleTapToFocus} 
+      />
+
+      {/* Tap to Focus Visual Box */}
+      {focusPoint && (
+        <View 
+          pointerEvents="none" 
+          style={[
+            styles.focusIndicator, 
+            { left: focusPoint.x - 32, top: focusPoint.y - 32 }
+          ]}
+        >
+          <View style={styles.focusCenterDot} />
+        </View>
+      )}
+
       {facing === 'front' && torch === 'on' && <FrontScreenFlash />}
 
+      {/* Live Recording Duration & Status Badge */}
       {isRecording && (
         <SafeAreaView style={styles.statusBadgeContainer} pointerEvents="none">
           <View style={styles.recordingStatusBadge}>
             <View style={[styles.statusDot, isPaused ? styles.statusDotPaused : styles.statusDotRecording]} />
-            <Text style={styles.statusText}>{isPaused ? 'DURAKLATILDI' : 'KAYIT'}</Text>
+            <Text style={styles.statusText}>
+              {isPaused ? `DURAKLATILDI  ${formatDuration(duration)}` : `KAYIT  ${formatDuration(duration)}`}
+            </Text>
           </View>
         </SafeAreaView>
       )}
 
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
+        {/* Quick Zoom Pills */}
+        <View style={styles.zoomContainer} pointerEvents="box-none">
+          {zoomLevels.map((lvl) => {
+            const isActiveZoom = Math.abs(zoom - lvl) < 0.2;
+            return (
+              <TouchableOpacity
+                key={lvl}
+                style={[styles.zoomPill, isActiveZoom && styles.zoomPillActive]}
+                onPress={() => setZoom(lvl)}
+              >
+                <Text style={[styles.zoomText, isActiveZoom && styles.zoomTextActive]}>
+                  {lvl}x
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <View style={styles.bottomControls}>
           <View style={styles.sideColumn}>
             {(facing === 'front' || device?.hasTorch) && (
@@ -535,6 +633,53 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  focusIndicator: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    borderWidth: 1.5,
+    borderColor: '#FFD700',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+  },
+  focusCenterDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFD700',
+  },
+  zoomContainer: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 24,
+    marginBottom: 16,
+    gap: 6,
+    zIndex: 15,
+  },
+  zoomPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  zoomPillActive: {
+    backgroundColor: '#FFD700',
+  },
+  zoomText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  zoomTextActive: {
+    color: '#000',
   },
 });
 
