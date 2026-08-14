@@ -28,6 +28,37 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+function FrontScreenFlash() {
+  const layers = [
+    { inset: 0, borderWidth: 24, borderColor: 'rgba(255, 255, 255, 1.0)' },
+    { inset: 24, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.8)' },
+    { inset: 40, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.6)' },
+    { inset: 56, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.42)' },
+    { inset: 72, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.26)' },
+    { inset: 88, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.14)' },
+    { inset: 104, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.05)' },
+  ];
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {layers.map((layer, index) => (
+        <View
+          key={index}
+          style={{
+            position: 'absolute',
+            top: layer.inset,
+            bottom: layer.inset,
+            left: layer.inset,
+            right: layer.inset,
+            borderWidth: layer.borderWidth,
+            borderColor: layer.borderColor,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 function MainApp() {
   const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
   const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } = useMicrophonePermission();
@@ -103,6 +134,7 @@ function MainApp() {
       const wasRecording = isRecording;
       await cameraRef.current.pauseRecording();
       setFacing(f => (f === 'back' ? 'front' : 'back'));
+      setTorch('off');
       
       if (wasRecording) {
         // Attempt to resume immediately. We use requestAnimationFrame to ensure React has updated the device prop.
@@ -135,14 +167,22 @@ function MainApp() {
         ref={cameraRef}
         video={true}
         audio={true}
-        torch={torch}
+        torch={facing === 'back' ? torch : 'off'}
       />
+      {facing === 'front' && torch === 'on' && <FrontScreenFlash />}
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
         <View style={styles.bottomControls}>
           <View style={styles.sideColumn}>
-            {device?.hasTorch && (
-              <TouchableOpacity style={styles.sideButton} onPress={toggleTorch}>
-                <Ionicons name={torch === 'on' ? 'flash' : 'flash-off'} size={28} color="#fff" />
+            {(facing === 'front' || device?.hasTorch) && (
+              <TouchableOpacity 
+                style={[styles.sideButton, torch === 'on' && styles.sideButtonActive]} 
+                onPress={toggleTorch}
+              >
+                <Ionicons 
+                  name={torch === 'on' ? 'flash' : 'flash-off'} 
+                  size={28} 
+                  color={torch === 'on' ? '#FFD700' : '#fff'} 
+                />
               </TouchableOpacity>
             )}
           </View>
@@ -200,6 +240,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  sideButtonActive: {
+    backgroundColor: 'rgba(255, 215, 0, 0.25)',
+    borderWidth: 1.5,
+    borderColor: '#FFD700',
   },
   recordButton: {
     width: 80,
