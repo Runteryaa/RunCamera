@@ -347,7 +347,7 @@ function MainApp() {
 
   return (
     <View style={styles.container}>
-      {/* Maximum Performance Direct Hardware SurfaceView */}
+      {/* Maximum Performance Direct Hardware SurfaceView with Locked 1:1 Portrait Preview */}
       <Camera 
         style={styles.camera} 
         device={device}
@@ -356,6 +356,9 @@ function MainApp() {
         video={true}
         audio={true}
         zoom={zoom}
+        resizeMode="cover"
+        orientationSource="interface"
+        outputOrientation="preview"
         androidPreviewViewType="surface-view"
         enableZoomGesture={true}
         torch={facing === 'back' ? torch : 'off'}
