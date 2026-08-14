@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView } from 'r
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -29,32 +30,63 @@ class ErrorBoundary extends React.Component {
 }
 
 function FrontScreenFlash() {
-  const layers = [
-    { inset: 0, borderWidth: 24, borderColor: 'rgba(255, 255, 255, 1.0)' },
-    { inset: 24, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.8)' },
-    { inset: 40, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.6)' },
-    { inset: 56, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.42)' },
-    { inset: 72, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.26)' },
-    { inset: 88, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.14)' },
-    { inset: 104, borderWidth: 16, borderColor: 'rgba(255, 255, 255, 0.05)' },
+  const gradientStops = [
+    'rgba(255, 255, 255, 1.0)',
+    'rgba(255, 255, 255, 0.90)',
+    'rgba(255, 255, 255, 0.72)',
+    'rgba(255, 255, 255, 0.48)',
+    'rgba(255, 255, 255, 0.28)',
+    'rgba(255, 255, 255, 0.12)',
+    'rgba(255, 255, 255, 0.03)',
+    'rgba(255, 255, 255, 0.0)',
+  ];
+
+  const reverseGradientStops = [
+    'rgba(255, 255, 255, 0.0)',
+    'rgba(255, 255, 255, 0.03)',
+    'rgba(255, 255, 255, 0.12)',
+    'rgba(255, 255, 255, 0.28)',
+    'rgba(255, 255, 255, 0.48)',
+    'rgba(255, 255, 255, 0.72)',
+    'rgba(255, 255, 255, 0.90)',
+    'rgba(255, 255, 255, 1.0)',
   ];
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {layers.map((layer, index) => (
-        <View
-          key={index}
-          style={{
-            position: 'absolute',
-            top: layer.inset,
-            bottom: layer.inset,
-            left: layer.inset,
-            right: layer.inset,
-            borderWidth: layer.borderWidth,
-            borderColor: layer.borderColor,
-          }}
-        />
-      ))}
+      {/* Outer Solid Ring for Maximum Illumination */}
+      <View style={styles.flashOuterBorder} />
+
+      {/* Top Cloud Fade */}
+      <LinearGradient
+        colors={gradientStops}
+        style={styles.flashGradientTop}
+      />
+
+      {/* Bottom Cloud Fade */}
+      <LinearGradient
+        colors={reverseGradientStops}
+        style={styles.flashGradientBottom}
+      />
+
+      {/* Left Cloud Fade */}
+      <LinearGradient
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        colors={gradientStops}
+        style={styles.flashGradientLeft}
+      />
+
+      {/* Right Cloud Fade */}
+      <LinearGradient
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        colors={reverseGradientStops}
+        style={styles.flashGradientRight}
+      />
+
+      {/* Soft Center Glow */}
+      <View style={styles.flashCenterAmbient} />
     </View>
   );
 }
@@ -281,6 +313,48 @@ const styles = StyleSheet.create({
   },
   camera: {
     ...StyleSheet.absoluteFillObject,
+  },
+  flashOuterBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 10,
+    borderColor: '#FFFFFF',
+    zIndex: 1,
+  },
+  flashGradientTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 140,
+    zIndex: 2,
+  },
+  flashGradientBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+    zIndex: 2,
+  },
+  flashGradientLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 85,
+    zIndex: 2,
+  },
+  flashGradientRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 85,
+    zIndex: 2,
+  },
+  flashCenterAmbient: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   statusBadgeContainer: {
     position: 'absolute',
