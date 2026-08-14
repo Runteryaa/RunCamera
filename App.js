@@ -80,9 +80,6 @@ function FrontScreenFlash() {
         colors={reverseGradientStops}
         style={styles.flashGradientRight}
       />
-
-      {/* 3. Soft Ambient Fill for Overall Screen Glow */}
-      <View style={styles.flashCenterAmbient} />
     </View>
   );
 }
@@ -435,11 +432,6 @@ const styles = StyleSheet.create({
     right: 32,
     width: 95,
     zIndex: 3,
-  },
-  flashCenterAmbient: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    zIndex: 1,
   },
   statusBadgeContainer: {
     position: 'absolute',
