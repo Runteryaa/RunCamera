@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView, AppState, StatusBar, Platform, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, SafeAreaView, AppState, StatusBar, Platform, PanResponder } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
@@ -319,7 +319,31 @@ function MainApp() {
   };
 
   const minZoom = device?.minZoom ?? 1;
-  const zoomLevels = minZoom < 1 ? [0.5, 1, 2, 3] : [1, 2, 3];
+  const maxZoom = Math.min(device?.maxZoom ?? 6, 8);
+  const rawPresets = minZoom < 1 ? [0.5, 1, 2, 3, 5] : [1, 2, 3, 5];
+  const validZoomPresets = rawPresets.filter(z => z >= minZoom && z <= maxZoom);
+
+  const sliderWidth = 200;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const x = evt.nativeEvent.locationX;
+        const clampedX = Math.max(0, Math.min(x, sliderWidth));
+        const ratio = clampedX / sliderWidth;
+        const newZoom = minZoom + ratio * (maxZoom - minZoom);
+        setZoom(parseFloat(newZoom.toFixed(1)));
+      },
+      onPanResponderMove: (evt) => {
+        const x = evt.nativeEvent.locationX;
+        const clampedX = Math.max(0, Math.min(x, sliderWidth));
+        const ratio = clampedX / sliderWidth;
+        const newZoom = minZoom + ratio * (maxZoom - minZoom);
+        setZoom(parseFloat(newZoom.toFixed(1)));
+      },
+    })
+  ).current;
 
   return (
     <View style={styles.container}>
@@ -372,22 +396,68 @@ function MainApp() {
       )}
 
       <SafeAreaView style={styles.uiContainer} pointerEvents="box-none">
-        {/* Quick Zoom Controls */}
-        <View style={styles.zoomContainer} pointerEvents="box-none">
-          {zoomLevels.map((lvl) => {
-            const isActiveZoom = Math.abs(zoom - lvl) < 0.2;
-            return (
-              <TouchableOpacity
-                key={lvl}
-                style={[styles.zoomPill, isActiveZoom && styles.zoomPillActive]}
-                onPress={() => setZoom(lvl)}
-              >
-                <Text style={[styles.zoomText, isActiveZoom && styles.zoomTextActive]}>
-                  {lvl}x
+        {/* Adjustable Zoom System with Presets and Slider */}
+        <View style={styles.zoomWrapper} pointerEvents="box-none">
+          <View style={styles.zoomContainer} pointerEvents="box-none">
+            {/* Step Minus */}
+            <TouchableOpacity 
+              style={styles.zoomStepButton} 
+              onPress={() => setZoom(z => Math.max(minZoom, parseFloat((z - 0.2).toFixed(1))))}
+            >
+              <Ionicons name="remove" size={14} color="#fff" />
+            </TouchableOpacity>
+
+            {/* Presets */}
+            {validZoomPresets.map((lvl) => {
+              const isSelected = Math.abs(zoom - lvl) < 0.15;
+              return (
+                <TouchableOpacity
+                  key={lvl}
+                  style={[styles.zoomPill, isSelected && styles.zoomPillActive]}
+                  onPress={() => setZoom(lvl)}
+                >
+                  <Text style={[styles.zoomText, isSelected && styles.zoomTextActive]}>
+                    {lvl}x
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Custom Dynamic Zoom Badge if not on a preset */}
+            {!validZoomPresets.some(lvl => Math.abs(zoom - lvl) < 0.15) && (
+              <View style={[styles.zoomPill, styles.zoomPillActive]}>
+                <Text style={[styles.zoomText, styles.zoomTextActive]}>
+                  {zoom.toFixed(1)}x
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
+              </View>
+            )}
+
+            {/* Step Plus */}
+            <TouchableOpacity 
+              style={styles.zoomStepButton} 
+              onPress={() => setZoom(z => Math.min(maxZoom, parseFloat((z + 0.2).toFixed(1))))}
+            >
+              <Ionicons name="add" size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Smooth Continuous Slider Track */}
+          <View style={styles.sliderTouchArea} {...panResponder.panHandlers}>
+            <View style={styles.sliderTrack}>
+              <View 
+                style={[
+                  styles.sliderFill, 
+                  { width: `${Math.max(0, Math.min(100, ((zoom - minZoom) / (maxZoom - minZoom)) * 100))}%` }
+                ]} 
+              />
+              <View 
+                style={[
+                  styles.sliderThumb, 
+                  { left: `${Math.max(0, Math.min(100, ((zoom - minZoom) / (maxZoom - minZoom)) * 100))}%` }
+                ]} 
+              />
+            </View>
+          </View>
         </View>
 
         <View style={styles.bottomControls}>
@@ -635,22 +705,34 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#FFD700',
   },
+  zoomWrapper: {
+    alignItems: 'center',
+    marginBottom: 16,
+    zIndex: 15,
+  },
   zoomContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 24,
-    marginBottom: 16,
     gap: 6,
-    zIndex: 15,
+  },
+  zoomStepButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   zoomPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    minWidth: 34,
+    height: 34,
+    paddingHorizontal: 6,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -665,6 +747,36 @@ const styles = StyleSheet.create({
   },
   zoomTextActive: {
     color: '#000',
+  },
+  sliderTouchArea: {
+    width: 200,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sliderTrack: {
+    width: 200,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    position: 'relative',
+  },
+  sliderFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: '#FFD700',
+  },
+  sliderThumb: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#FFD700',
+    top: -5,
+    marginLeft: -7,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
 });
 
