@@ -4,6 +4,7 @@ import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission }
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Brightness from 'expo-brightness';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -32,52 +33,47 @@ class ErrorBoundary extends React.Component {
 function FrontScreenFlash() {
   const gradientStops = [
     'rgba(255, 255, 255, 1.0)',
-    'rgba(255, 255, 255, 0.98)',
-    'rgba(255, 255, 255, 0.88)',
-    'rgba(255, 255, 255, 0.68)',
-    'rgba(255, 255, 255, 0.42)',
-    'rgba(255, 255, 255, 0.20)',
-    'rgba(255, 255, 255, 0.05)',
+    'rgba(255, 255, 255, 0.95)',
+    'rgba(255, 255, 255, 0.80)',
+    'rgba(255, 255, 255, 0.55)',
+    'rgba(255, 255, 255, 0.30)',
+    'rgba(255, 255, 255, 0.12)',
     'rgba(255, 255, 255, 0.0)',
   ];
 
   const reverseGradientStops = [
     'rgba(255, 255, 255, 0.0)',
-    'rgba(255, 255, 255, 0.05)',
-    'rgba(255, 255, 255, 0.20)',
-    'rgba(255, 255, 255, 0.42)',
-    'rgba(255, 255, 255, 0.68)',
-    'rgba(255, 255, 255, 0.88)',
-    'rgba(255, 255, 255, 0.98)',
+    'rgba(255, 255, 255, 0.12)',
+    'rgba(255, 255, 255, 0.30)',
+    'rgba(255, 255, 255, 0.55)',
+    'rgba(255, 255, 255, 0.80)',
+    'rgba(255, 255, 255, 0.95)',
     'rgba(255, 255, 255, 1.0)',
   ];
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {/* Outer Solid Ring for Maximum Illumination */}
-      <View style={styles.flashOuterBorder} />
+      {/* 1. Broad Solid White Bars for Maximum Screen Lumens (TikTok Style) */}
+      <View style={styles.flashSolidTop} />
+      <View style={styles.flashSolidBottom} />
+      <View style={styles.flashSolidLeft} />
+      <View style={styles.flashSolidRight} />
 
-      {/* Top Cloud Fade */}
+      {/* 2. Deep Inward Cloud Fade */}
       <LinearGradient
         colors={gradientStops}
         style={styles.flashGradientTop}
       />
-
-      {/* Bottom Cloud Fade */}
       <LinearGradient
         colors={reverseGradientStops}
         style={styles.flashGradientBottom}
       />
-
-      {/* Left Cloud Fade */}
       <LinearGradient
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         colors={gradientStops}
         style={styles.flashGradientLeft}
       />
-
-      {/* Right Cloud Fade */}
       <LinearGradient
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
@@ -85,7 +81,7 @@ function FrontScreenFlash() {
         style={styles.flashGradientRight}
       />
 
-      {/* Soft Center Glow */}
+      {/* 3. Soft Ambient Fill for Overall Screen Glow */}
       <View style={styles.flashCenterAmbient} />
     </View>
   );
@@ -101,8 +97,39 @@ function MainApp() {
   const [isPaused, setIsPaused] = useState(false);
   const [torch, setTorch] = useState('off');
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+  const originalBrightnessRef = useRef(null);
   const device = useCameraDevice(facing);
   const cameraRef = useRef(null);
+
+  // Screen Brightness Boost for Front Camera Flash (TikTok Style)
+  useEffect(() => {
+    const manageBrightness = async () => {
+      try {
+        if (facing === 'front' && torch === 'on' && isAppActive) {
+          if (originalBrightnessRef.current === null) {
+            const cur = await Brightness.getBrightnessAsync();
+            originalBrightnessRef.current = cur;
+          }
+          await Brightness.setBrightnessAsync(1.0);
+        } else {
+          if (originalBrightnessRef.current !== null) {
+            await Brightness.setBrightnessAsync(originalBrightnessRef.current);
+            originalBrightnessRef.current = null;
+          }
+        }
+      } catch (e) {
+        console.warn("Brightness control error:", e);
+      }
+    };
+
+    manageBrightness();
+
+    return () => {
+      if (originalBrightnessRef.current !== null) {
+        Brightness.setBrightnessAsync(originalBrightnessRef.current).catch(() => {});
+      }
+    };
+  }, [facing, torch, isAppActive]);
 
   useEffect(() => {
     (async () => {
@@ -341,47 +368,78 @@ const styles = StyleSheet.create({
   camera: {
     ...StyleSheet.absoluteFillObject,
   },
-  flashOuterBorder: {
-    ...StyleSheet.absoluteFillObject,
-    borderWidth: 26,
-    borderColor: '#FFFFFF',
-    zIndex: 1,
-  },
-  flashGradientTop: {
+  flashSolidTop: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 180,
+    height: 44,
+    backgroundColor: '#FFFFFF',
     zIndex: 2,
   },
-  flashGradientBottom: {
+  flashSolidBottom: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 200,
+    height: 90,
+    backgroundColor: '#FFFFFF',
     zIndex: 2,
+  },
+  flashSolidLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 32,
+    backgroundColor: '#FFFFFF',
+    zIndex: 2,
+  },
+  flashSolidRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 32,
+    backgroundColor: '#FFFFFF',
+    zIndex: 2,
+  },
+  flashGradientTop: {
+    position: 'absolute',
+    top: 44,
+    left: 0,
+    right: 0,
+    height: 160,
+    zIndex: 3,
+  },
+  flashGradientBottom: {
+    position: 'absolute',
+    bottom: 90,
+    left: 0,
+    right: 0,
+    height: 170,
+    zIndex: 3,
   },
   flashGradientLeft: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: 0,
-    width: 110,
-    zIndex: 2,
+    left: 32,
+    width: 95,
+    zIndex: 3,
   },
   flashGradientRight: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    right: 0,
-    width: 110,
-    zIndex: 2,
+    right: 32,
+    width: 95,
+    zIndex: 3,
   },
   flashCenterAmbient: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    zIndex: 1,
   },
   statusBadgeContainer: {
     position: 'absolute',
