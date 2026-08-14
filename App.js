@@ -342,17 +342,26 @@ function MainApp() {
 
   return (
     <View style={styles.container}>
-      <Camera 
-        style={[styles.camera, isMirrored && styles.mirroredCamera]} 
-        device={device}
-        isActive={isAppActive}
-        ref={cameraRef}
-        video={true}
-        audio={true}
-        zoom={zoom}
-        enableZoomGesture={true}
-        torch={facing === 'back' ? torch : 'off'}
-      />
+      {/* Camera Viewport with True Hardware Mirroring */}
+      <View 
+        style={[
+          styles.cameraContainer, 
+          isMirrored && styles.cameraContainerMirrored
+        ]} 
+        collapsable={false}
+      >
+        <Camera 
+          style={styles.camera} 
+          device={device}
+          isActive={isAppActive}
+          ref={cameraRef}
+          video={true}
+          audio={true}
+          zoom={zoom}
+          enableZoomGesture={true}
+          torch={facing === 'back' ? torch : 'off'}
+        />
+      </View>
 
       {/* Tap to Focus Tap Area */}
       <TouchableOpacity 
@@ -475,11 +484,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     justifyContent: 'center',
   },
+  cameraContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  cameraContainerMirrored: {
+    transform: [{ scaleX: -1 }],
+  },
   camera: {
     ...StyleSheet.absoluteFillObject,
-  },
-  mirroredCamera: {
-    transform: [{ scaleX: -1 }],
   },
   flashSolidTop: {
     position: 'absolute',
